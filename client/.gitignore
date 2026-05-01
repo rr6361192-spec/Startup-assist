@@ -1,0 +1,604 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+
+
+import React from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
+function Vt({ report }) {
+  if (!report) {
+    return (
+      <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+        <p>No report data available.</p>
+      </div>
+    );
+  }
+
+  // PDF Generation Function
+  const downloadPDF = () => {
+    const doc = new jsPDF();
+    let yPos = 20;
+    const lineHeight = 7;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 20;
+    const maxWidth = pageWidth - (margin * 2);
+
+    // Helper function to add wrapped text
+    const addWrappedText = (text, x, y, maxWidth, fontSize = 10, isBold = false) => {
+      if (!text) return y;
+      doc.setFontSize(fontSize);
+      doc.setFont("helvetica", isBold ? "bold" : "normal");
+      const lines = doc.splitTextToSize(text, maxWidth);
+      doc.text(lines, x, y);
+      return y + (lines.length * lineHeight);
+    };
+
+    // Helper function to add section title
+    const addSectionTitle = (title, y) => {
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(139, 92, 246);
+      doc.text(title, margin, y);
+      doc.setDrawColor(139, 92, 246);
+      doc.line(margin, y + 2, pageWidth - margin, y + 2);
+      return y + 10;
+    };
+
+    // Helper function to check if we need a new page
+    const checkPageBreak = (y) => {
+      if (y > 270) {
+        doc.addPage();
+        return 20;
+      }
+      return y;
+    };
+
+    // HEADER
+    doc.setFontSize(22);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 0, 0);
+    doc.text("Startup Validation Report", margin, yPos);
+    yPos += 10;
+    
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, margin, yPos);
+    yPos += 15;
+
+    // IDEA
+    if (report.idea) {
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0, 0, 0);
+      doc.text("Idea Overview", margin, yPos);
+      yPos += 7;
+      yPos = addWrappedText(report.idea, margin, yPos, maxWidth, 11, false);
+      yPos += 5;
+    }
+
+    // UVP STATEMENT
+    if (report.uvp?.statement) {
+      yPos = addSectionTitle("Unique Value Proposition", yPos);
+      yPos = addWrappedText(report.uvp.statement, margin + 5, yPos, maxWidth - 5, 10, true);
+      yPos += 5;
+    }
+
+    // UVP POINTS
+    if (report.uvp?.points && report.uvp.points.length > 0) {
+      yPos = addSectionTitle("Value Proposition Details", yPos);
+      report.uvp.points.forEach((point) => {
+        yPos = checkPageBreak(yPos);
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(139, 92, 246);
+        doc.text(`• ${point.title}:`, margin + 5, yPos);
+        yPos += 5;
+        yPos = addWrappedText(point.desc, margin + 10, yPos, maxWidth - 10, 10, false);
+        yPos += 3;
+      });
+    }
+
+    // COMPETITORS TABLE
+    if (report.competitors && report.competitors.length > 0) {
+      yPos = addSectionTitle("Competitor Analysis", yPos);
+      yPos += 5;
+      
+      const competitorData = report.competitors.map(comp => [
+        comp.name,
+        comp.tagline || "—",
+        comp.strengths?.slice(0, 2).join(", ") || "—",
+        comp.weaknesses?.slice(0, 2).join(", ") || "—"
+      ]);
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [["Competitor", "Tagline", "Key Strengths", "Key Weaknesses"]],
+        body: competitorData,
+        margin: { left: margin, right: margin },
+        styles: { fontSize: 8, cellPadding: 3 },
+        headStyles: { fillColor: [139, 92, 246], textColor: [255, 255, 255], fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [245, 245, 245] }
+      });
+      
+      yPos = doc.lastAutoTable.finalY + 10;
+    }
+
+    // FEATURES COMPARISON TABLE
+    if (report.features && report.features.length > 0 && report.competitors && report.competitors.length > 0) {
+      yPos = addSectionTitle("Feature Comparison", yPos);
+      yPos += 5;
+      
+      const featureHeaders = ["Feature", "Your Product", ...report.competitors.map(c => c.name)];
+      const featureData = report.features.map(feature => [
+        feature.name,
+        feature.values?.your_product ? "✓" : "✗",
+        ...report.competitors.map(comp => feature.values?.[comp.name] ? "✓" : "✗")
+      ]);
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [featureHeaders],
+        body: featureData,
+        margin: { left: margin, right: margin },
+        styles: { fontSize: 8, cellPadding: 3 },
+        headStyles: { fillColor: [99, 102, 241], textColor: [255, 255, 255], fontStyle: "bold" },
+        columnStyles: {
+          0: { cellWidth: 50 },
+          1: { cellWidth: 30, halign: "center" },
+          2: { cellWidth: 30, halign: "center" },
+          3: { cellWidth: 30, halign: "center" }
+        }
+      });
+      
+      yPos = doc.lastAutoTable.finalY + 10;
+    }
+
+    // POSITIONING MAP - Text Description
+    if (report.positioning) {
+      yPos = addSectionTitle("Market Positioning", yPos);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(0, 0, 0);
+      doc.text(`Your Product Position: (${report.positioning.your_product?.x || 50}, ${report.positioning.your_product?.y || 50})`, margin + 5, yPos);
+      yPos += 6;
+      
+      if (report.positioning.market_gap) {
+        doc.text(`Market Gap Position: (${report.positioning.market_gap.x}, ${report.positioning.market_gap.y})`, margin + 5, yPos);
+        yPos += 6;
+      }
+      
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.text("Note: X-axis represents Price (left=low, right=high)", margin + 5, yPos);
+      yPos += 5;
+      doc.text("Y-axis represents Quality (bottom=low, top=high)", margin + 5, yPos);
+      yPos += 8;
+    }
+
+    // TAKEAWAYS
+    if (report.takeaways && report.takeaways.length > 0) {
+      yPos = addSectionTitle("Key Takeaways", yPos);
+      report.takeaways.forEach((takeaway, idx) => {
+        yPos = checkPageBreak(yPos);
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(139, 92, 246);
+        doc.text(`${idx + 1}. ${takeaway.title}`, margin + 5, yPos);
+        yPos += 5;
+        yPos = addWrappedText(takeaway.desc, margin + 10, yPos, maxWidth - 10, 10, false);
+        yPos += 3;
+      });
+    }
+
+    // NEXT STEPS
+    if (report.next_steps) {
+      yPos = addSectionTitle("Recommended Next Steps", yPos);
+      const sentences = report.next_steps.split(/[.!?]+/).filter(s => s.trim().length > 20);
+      if (sentences.length > 0) {
+        sentences.slice(0, 5).forEach((sentence) => {
+          yPos = checkPageBreak(yPos);
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(0, 0, 0);
+          const cleanSentence = sentence.trim().replace(/^\d+\.\s*/, '');
+          if (cleanSentence.length > 5) {
+            const wrappedLines = doc.splitTextToSize(`• ${cleanSentence}.`, maxWidth - 10);
+            doc.text(wrappedLines, margin + 5, yPos);
+            yPos += (wrappedLines.length * 5);
+          }
+        });
+      } else {
+        yPos = addWrappedText(report.next_steps, margin + 5, yPos, maxWidth - 10, 10, false);
+      }
+    }
+
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(150, 150, 150);
+      doc.text(
+        `Startup Validation Report - Page ${i} of ${pageCount}`,
+        margin,
+        doc.internal.pageSize.getHeight() - 10
+      );
+    }
+
+    doc.save(`startup-report-${Date.now()}.pdf`);
+  };
+
+  return (
+    <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
+      {/* Header */}
+      <div style={{ marginBottom: "32px" }}>
+        <h2 style={{ fontSize: "28px", fontWeight: "700", color: "white", marginBottom: "12px" }}>
+          {report.idea || "Startup Analysis Report"}
+        </h2>
+        {report.uvp?.statement && (
+          <p style={{ color: "#a78bfa", fontSize: "18px", fontWeight: "500" }}>
+            {report.uvp.statement}
+          </p>
+        )}
+      </div>
+
+      {/* Action Buttons */}
+      <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", marginBottom: "24px" }}>
+        <button
+          onClick={downloadPDF}
+          style={{
+            padding: "10px 20px",
+            borderRadius: "10px",
+            background: "linear-gradient(135deg, #ef4444, #dc2626)",
+            border: "none",
+            color: "white",
+            fontWeight: "600",
+            cursor: "pointer",
+            fontSize: "13px",
+            transition: "transform 0.2s",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-2px)"}
+          onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
+        >
+          📄 Download PDF (ATS Friendly)
+        </button>
+        
+        <button
+          onClick={() => {
+            const dataStr = JSON.stringify(report, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            const exportFileDefaultName = `startup-report-${Date.now()}.json`;
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+          }}
+          style={{
+            padding: "10px 20px",
+            borderRadius: "10px",
+            background: "linear-gradient(135deg, #8b5cf6, #6366f1)",
+            border: "none",
+            color: "white",
+            fontWeight: "600",
+            cursor: "pointer",
+            fontSize: "13px",
+            transition: "transform 0.2s",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-2px)"}
+          onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
+        >
+          📥 Download JSON
+        </button>
+      </div>
+
+      {/* UVP Points */}
+      {report.uvp?.points && report.uvp.points.length > 0 && (
+        <div style={{ marginBottom: "32px" }}>
+          <h3 style={{ color: "white", fontSize: "18px", marginBottom: "16px" }}>🎯 Value Proposition</h3>
+          <div style={{ display: "grid", gap: "16px" }}>
+            {report.uvp.points.map((point, i) => (
+              <div key={i} style={{
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: "12px",
+                padding: "16px"
+              }}>
+                <h4 style={{ color: "#a78bfa", fontSize: "14px", fontWeight: "600", marginBottom: "8px" }}>
+                  {point.title}
+                </h4>
+                <p style={{ color: "#cbd5e1", fontSize: "14px", lineHeight: "1.6" }}>
+                  {point.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Competitors */}
+      {report.competitors && report.competitors.length > 0 && (
+        <div style={{ marginBottom: "32px" }}>
+          <h3 style={{ color: "white", fontSize: "18px", marginBottom: "16px" }}>🏢 Competitor Analysis</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
+            {report.competitors.map((comp, i) => (
+              <div key={i} style={{
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: "12px",
+                padding: "16px"
+              }}>
+                <h4 style={{ color: "white", fontSize: "16px", fontWeight: "600", marginBottom: "4px" }}>
+                  {comp.name}
+                </h4>
+                <p style={{ color: "#94a3b8", fontSize: "12px", marginBottom: "12px" }}>
+                  {comp.tagline}
+                </p>
+                <div style={{ marginBottom: "8px" }}>
+                  <div style={{ color: "#34d399", fontSize: "13px", fontWeight: "600", marginBottom: "4px" }}>
+                    Strengths:
+                  </div>
+                  <ul style={{ color: "#cbd5e1", fontSize: "13px", marginLeft: "20px" }}>
+                    {comp.strengths?.map((s, j) => <li key={j}>{s}</li>)}
+                  </ul>
+                </div>
+                <div>
+                  <div style={{ color: "#f87171", fontSize: "13px", fontWeight: "600", marginBottom: "4px" }}>
+                    Weaknesses:
+                  </div>
+                  <ul style={{ color: "#cbd5e1", fontSize: "13px", marginLeft: "20px" }}>
+                    {comp.weaknesses?.map((w, j) => <li key={j}>{w}</li>)}
+                  </ul>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Features Comparison */}
+      {report.features && report.features.length > 0 && (
+        <div style={{ marginBottom: "32px" }}>
+          <h3 style={{ color: "white", fontSize: "18px", marginBottom: "16px" }}>⚡ Feature Comparison</h3>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+                  <th style={{ textAlign: "left", padding: "12px", color: "#94a3b8", fontWeight: "500" }}>Feature</th>
+                  <th style={{ textAlign: "center", padding: "12px", color: "#a78bfa", fontWeight: "600" }}>Your Product</th>
+                  {report.competitors?.map((comp, i) => (
+                    <th key={i} style={{ textAlign: "center", padding: "12px", color: "#94a3b8", fontWeight: "500" }}>
+                      {comp.name}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {report.features.map((feature, i) => (
+                  <tr key={i} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                    <td style={{ padding: "12px", color: "white" }}>{feature.name}</td>
+                    <td style={{ textAlign: "center", padding: "12px" }}>
+                      {feature.values?.your_product ? "✅" : "❌"}
+                    </td>
+                    {report.competitors?.map((comp, j) => (
+                      <td key={j} style={{ textAlign: "center", padding: "12px" }}>
+                        {feature.values?.[comp.name] ? "✅" : "❌"}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Positioning Map */}
+      {report.positioning && (
+        <div style={{ marginBottom: "32px" }}>
+          <h3 style={{ color: "white", fontSize: "18px", marginBottom: "16px" }}>📍 Positioning Map</h3>
+          <div style={{
+            background: "rgba(0,0,0,0.4)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: "12px",
+            padding: "20px",
+            position: "relative",
+            height: "300px"
+          }}>
+            {/* Grid lines */}
+            <div style={{
+              position: "absolute",
+              bottom: "50%",
+              left: "0",
+              right: "0",
+              height: "1px",
+              background: "rgba(255,255,255,0.1)"
+            }} />
+            <div style={{
+              position: "absolute",
+              left: "50%",
+              top: "0",
+              bottom: "0",
+              width: "1px",
+              background: "rgba(255,255,255,0.1)"
+            }} />
+            
+            {/* Axis Labels */}
+            <div style={{ position: "absolute", bottom: "5px", left: "10px", color: "#64748b", fontSize: "11px" }}>
+              Low Price
+            </div>
+            <div style={{ position: "absolute", bottom: "5px", right: "10px", color: "#64748b", fontSize: "11px" }}>
+              High Price
+            </div>
+            <div style={{ position: "absolute", top: "10px", left: "10px", color: "#64748b", fontSize: "11px" }}>
+              High Quality
+            </div>
+            <div style={{ position: "absolute", bottom: "10px", left: "10px", color: "#64748b", fontSize: "11px" }}>
+              Low Quality
+            </div>
+            
+            {/* Your Product */}
+            <div style={{
+              position: "absolute",
+              left: `${report.positioning.your_product?.x || 50}%`,
+              bottom: `${report.positioning.your_product?.y || 50}%`,
+              transform: "translate(-50%, 50%)",
+              width: "40px",
+              height: "40px",
+              background: "#8b5cf6",
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "white",
+              fontWeight: "bold",
+              fontSize: "12px",
+              boxShadow: "0 0 20px rgba(139,92,246,0.5)",
+              zIndex: 10
+            }}>
+              You
+            </div>
+
+            {/* Competitors */}
+            {report.positioning.competitors?.map((comp, i) => (
+              <div
+                key={i}
+                style={{
+                  position: "absolute",
+                  left: `${comp.x}%`,
+                  bottom: `${comp.y}%`,
+                  transform: "translate(-50%, 50%)",
+                  width: "30px",
+                  height: "30px",
+                  background: "#ef4444",
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "white",
+                  fontWeight: "bold",
+                  fontSize: "10px",
+                  zIndex: 5
+                }}
+              >
+                {i + 1}
+              </div>
+            ))}
+
+            {/* Market Gap */}
+            {report.positioning.market_gap && (
+              <div style={{
+                position: "absolute",
+                left: `${report.positioning.market_gap.x}%`,
+                bottom: `${report.positioning.market_gap.y}%`,
+                transform: "translate(-50%, 50%)",
+                width: "50px",
+                height: "50px",
+                border: "2px dashed #f59e0b",
+                borderRadius: "12px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#f59e0b",
+                fontSize: "10px",
+                fontWeight: "bold",
+                background: "rgba(245, 158, 11, 0.1)",
+                zIndex: 1
+              }}>
+                GAP
+              </div>
+            )}
+          </div>
+          
+          {/* Competitor Legend */}
+          {report.positioning.competitors && report.positioning.competitors.length > 0 && (
+            <div style={{ marginTop: "16px", display: "flex", gap: "16px", flexWrap: "wrap", justifyContent: "center" }}>
+              {report.positioning.competitors.map((comp, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <div style={{ width: "12px", height: "12px", background: "#ef4444", borderRadius: "50%" }} />
+                  <span style={{ color: "#94a3b8", fontSize: "11px" }}>
+                    {i + 1}. {comp.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Takeaways */}
+      {report.takeaways && report.takeaways.length > 0 && (
+        <div style={{ marginBottom: "32px" }}>
+          <h3 style={{ color: "white", fontSize: "18px", marginBottom: "16px" }}>💡 Key Takeaways</h3>
+          <div style={{ display: "grid", gap: "16px" }}>
+            {report.takeaways.map((takeaway, i) => (
+              <div key={i} style={{
+                background: "rgba(139,92,246,0.05)",
+                border: "1px solid rgba(139,92,246,0.2)",
+                borderRadius: "12px",
+                padding: "16px"
+              }}>
+                <h4 style={{ color: "#a78bfa", fontSize: "14px", fontWeight: "600", marginBottom: "8px" }}>
+                  {takeaway.title}
+                </h4>
+                <p style={{ color: "#cbd5e1", fontSize: "14px", lineHeight: "1.6" }}>
+                  {takeaway.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Next Steps */}
+      {report.next_steps && (
+        <div style={{ marginBottom: "32px" }}>
+          <h3 style={{ color: "white", fontSize: "18px", marginBottom: "16px" }}>🚀 Next Steps</h3>
+          <div style={{
+            background: "linear-gradient(135deg, rgba(139,92,246,0.1), rgba(99,102,241,0.05))",
+            border: "1px solid rgba(139,92,246,0.2)",
+            borderRadius: "12px",
+            padding: "20px"
+          }}>
+            <p style={{ color: "#cbd5e1", fontSize: "14px", lineHeight: "1.6" }}>
+              {report.next_steps}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default Vt;

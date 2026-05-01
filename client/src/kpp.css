@@ -1,0 +1,88 @@
+/* App.css */
+body {
+  margin: 0;
+  font-family: "Segoe UI", sans-serif;
+  background: #f9f9f9;
+  color: #333;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background: white;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.header nav a {
+  margin: 0 1rem;
+  text-decoration: none;
+  color: #333;
+}
+
+.btn-primary {
+  background: #0078ff;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.btn-secondary {
+  background: transparent;
+  border: 2px solid #0078ff;
+  color: #0078ff;
+  padding: 0.6rem 1.2rem;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3rem 2rem;
+  background: linear-gradient(to right, #e0f2ff, #f9f9f9);
+}
+
+.hero-text {
+  max-width: 50%;
+}
+
+.hero-buttons {
+  margin-top: 1rem;
+}
+
+.hero-illustration img {
+  max-width: 100%;
+  border-radius: 10px;
+}
+
+.features {
+  text-align: center;
+  padding: 3rem 2rem;
+}
+
+.feature-grid {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.feature-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  width: 250px;
+}
+
+.cta {
+  text-align: center;
+  padding: 3rem 2rem;
+  background: linear-gradient(90deg, #0078ff, #00c6ff);
+  color: white;
+}
